@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgeLive demo</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--card:#f2f2f2;--ok:#1a7f37;--bad:#c62828;--warn:#b26a00}
+@media (prefers-color-scheme:dark){:root{--bg:#161616;--fg:#eee;--card:#262626;--ok:#4cc26a;--bad:#ff6b6b;--warn:#ffb74d}}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif;max-width:640px;margin-inline:auto}
+video{width:100%;border-radius:12px;transform:scaleX(-1);background:#000}
+#status{font-size:20px;font-weight:600;margin:12px 0}
+pre{background:var(--card);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px}
+button{font:inherit;padding:10px 16px;border-radius:8px;border:0;background:var(--fg);color:var(--bg)}
+</style>
+</head>
+<body>
+<h2>AgeLive: возраст + liveness</h2>
+<video id="v" autoplay playsinline muted></video>
+<div id="status">Нажмите «Старт»</div>
+<button id="go">Старт</button>
+<pre id="json">{}</pre>
+<script>
+const MSG={no_face:"Лицо не найдено",bad_quality:"Плохой кадр: ",uncertain:"Не удалось подтвердить, что вы живой",
+rejected:"Отклонено (подозрение на подмену)"};
+const CH={blink:"Моргните",turn_left:"Поверните голову влево",turn_right:"Поверните голову вправо"};
+const $=id=>document.getElementById(id);
+let ws,timer;
+$("go").onclick=async()=>{
+  const stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});
+  $("v").srcObject=stream;
+  const proto=location.protocol==="https:"?"wss":"ws";
+  ws=new WebSocket(`${proto}://${location.host}/stream?threshold=18`);
+  ws.onmessage=e=>{
+    const r=JSON.parse(e.data); $("json").textContent=JSON.stringify(r,null,2);
+    const s=$("status");
+    if(r.status==="ok"){s.textContent=`Живой. Возраст ≈ ${r.age} (${r.age_range[0]}-${r.age_range[1]}), 18+: ${Math.round(r.p_over_threshold*100)}%`;s.style.color="var(--ok)"}
+    else if(r.status==="challenge"){s.textContent=CH[r.challenge]||"Выполните действие";s.style.color="var(--warn)"}
+    else{s.textContent=(MSG[r.status]||r.status)+(r.status==="bad_quality"?r.reasons.join(", "):"");s.style.color="var(--bad)"}
+  };
+  const c=document.createElement("canvas");c.width=640;c.height=480;
+  ws.onopen=()=>{timer=setInterval(()=>{
+    if(ws.bufferedAmount>0)return;                 // не копим очередь
+    c.getContext("2d").drawImage($("v"),0,0,640,480);
+    c.toBlob(b=>b&&ws.send(b),"image/jpeg",0.8);
+  },100)};                                         // ~10 FPS (нужно для детекции моргания)
+  ws.onclose=()=>clearInterval(timer);
+};
+</script>
+</body>
+</html>
