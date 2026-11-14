@@ -12,6 +12,7 @@ class Session:
         self.ages = deque(maxlen=window)
         self.ranges = deque(maxlen=window)
         self.confs = deque(maxlen=window)
+        self.probs = deque(maxlen=window)
         self.lives = deque(maxlen=window)
         self.challenge = None
         self.verified_until = 0.0
@@ -21,11 +22,18 @@ class Session:
         self.lives.append(s)
         return float(np.mean(self.lives))
 
-    def push_age(self, age: float, rng, conf: float):
-        self.ages.append(age); self.ranges.append(rng); self.confs.append(conf)
-        return (float(np.median(self.ages)),
-                list(np.median(np.array(self.ranges), axis=0)),
-                float(np.mean(self.confs)))
+    def push_age(self, age: float, rng, conf: float, probs: Optional[np.ndarray] = None):
+        self.ages.append(age)
+        self.ranges.append(rng)
+        self.confs.append(conf)
+        med_age = float(np.median(self.ages))
+        med_rng = list(np.median(np.array(self.ranges), axis=0))
+        mean_conf = float(np.mean(self.confs))
+        if probs is None:
+            return med_age, med_rng, mean_conf
+        self.probs.append(probs)
+        mean_probs = np.mean(np.array(self.probs), axis=0)
+        return med_age, med_rng, mean_conf, mean_probs
 
 
 class SessionStore:

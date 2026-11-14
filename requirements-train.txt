@@ -3,3 +3,4 @@ torchvision>=0.17
 numpy
 opencv-python-headless
 onnx
+onnxscript

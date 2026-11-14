@@ -23,6 +23,7 @@ button{font:inherit;padding:10px 16px;border-radius:8px;border:0;background:var(
 <script>
 const MSG={no_face:"Лицо не найдено",bad_quality:"Плохой кадр: ",uncertain:"Не удалось подтвердить, что вы живой",
 rejected:"Отклонено (подозрение на подмену)"};
+const RSN={face_too_small:"подойдите ближе",blurry:"камера размыта",too_dark:"слишком темно",too_bright:"слишком ярко",head_turned:"смотрите прямо в камеру"};
 const CH={blink:"Моргните",turn_left:"Поверните голову влево",turn_right:"Поверните голову вправо"};
 const $=id=>document.getElementById(id);
 let ws,timer;
@@ -36,7 +37,7 @@ $("go").onclick=async()=>{
     const s=$("status");
     if(r.status==="ok"){s.textContent=`Живой. Возраст ≈ ${r.age} (${r.age_range[0]}-${r.age_range[1]}), 18+: ${Math.round(r.p_over_threshold*100)}%`;s.style.color="var(--ok)"}
     else if(r.status==="challenge"){s.textContent=CH[r.challenge]||"Выполните действие";s.style.color="var(--warn)"}
-    else{s.textContent=(MSG[r.status]||r.status)+(r.status==="bad_quality"?r.reasons.join(", "):"");s.style.color="var(--bad)"}
+    else{s.textContent=(MSG[r.status]||r.status)+(r.status==="bad_quality"?r.reasons.map(x=>RSN[x]||x).join(", "):"");s.style.color="var(--bad)"}
   };
   const c=document.createElement("canvas");c.width=640;c.height=480;
   ws.onopen=()=>{timer=setInterval(()=>{

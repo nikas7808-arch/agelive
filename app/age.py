@@ -1,8 +1,4 @@
-"""Оценка возраста: DEX-подход (классификация 0..100 + матожидание).
-
-Модель: ONNX, вход 1x3x224x224 (RGB, ImageNet-нормализация), выход 1x101 логитов.
-Обучение и экспорт: scripts/train_age.py.
-"""
+"""Оценка возраста: DEX (101 класс) или прямая регрессия в ONNX."""
 import os
 from dataclasses import dataclass
 from typing import List
@@ -18,9 +14,9 @@ _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 @dataclass
 class AgeResult:
     age: float
-    low: float          # 10-й перцентиль
-    high: float         # 90-й перцентиль
-    confidence: float   # масса вероятности в окне +-5 лет от среднего
+    low: float
+    high: float
+    confidence: float
     probs: np.ndarray
 
     def p_over(self, threshold: int) -> float:
@@ -47,8 +43,8 @@ def distribution_stats(probs: np.ndarray) -> AgeResult:
     return AgeResult(mean, low, high, conf, probs)
 
 
-def preprocess(bgr_crop: np.ndarray) -> np.ndarray:
-    img = cv2.resize(bgr_crop, (224, 224))
+def preprocess(bgr_crop: np.ndarray, size: int = 224) -> np.ndarray:
+    img = cv2.resize(bgr_crop, (size, size))
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
     img = (img - _MEAN) / _STD
     return img.transpose(2, 0, 1)[None].astype(np.float32)
@@ -58,18 +54,27 @@ class AgeEstimator:
     def __init__(self, model_path: str, mock: bool = False) -> None:
         self.mock = mock
         self.sess = None
+        self.size = 224
         if not mock:
             if not os.path.exists(model_path):
                 raise FileNotFoundError(
                     f"Нет модели возраста: {model_path}. Обучите (scripts/train_age.py), "
-                    "положите в models/ или запустите с AGELIVE_MOCK=1.")
+                    "положите в models/ или запустите с AGELIVE_MOCK=1."
+                )
             import onnxruntime as ort
             self.sess = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
-            self.inp = self.sess.get_inputs()[0].name
+            inp = self.sess.get_inputs()[0]
+            self.inp = inp.name
+            if len(inp.shape) == 4 and isinstance(inp.shape[-1], int) and inp.shape[-1] > 0:
+                self.size = int(inp.shape[-1])
 
     def predict(self, bgr_crop: np.ndarray) -> AgeResult:
         if self.mock:
             g = np.exp(-0.5 * ((AGES - 30.0) / 6.0) ** 2)
             return distribution_stats(g)
-        logits = self.sess.run(None, {self.inp: preprocess(bgr_crop)})[0][0]
-        return distribution_stats(softmax(logits.astype(np.float32)))
+        raw = self.sess.run(None, {self.inp: preprocess(bgr_crop, self.size)})[0][0].astype(np.float32)
+        if raw.size == 101:
+            return distribution_stats(softmax(raw))
+        est = float(np.clip(raw[2] * 100.0 if raw.size == 3 else raw[0], 0.0, 100.0))
+        g = np.exp(-0.5 * ((AGES - est) / 3.5) ** 2)
+        return distribution_stats(g)

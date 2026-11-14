@@ -3,6 +3,8 @@
 Pipeline: детекция → quality gate → liveness (passive + active) → возраст → JSON. Возраст отдаётся только живым лицам.
 
 ## Быстрый старт
+> **Важно:** для работы детектора лица MediaPipe используйте **Python 3.11 или 3.12** (на 3.14 старый API `mp.solutions` недоступен).
+
 ```bash
 pip install -r requirements.txt
 AGELIVE_MOCK=1 uvicorn app.main:app --reload     # без весов, заглушки моделей
@@ -29,6 +31,13 @@ Docker: `docker build -t agelive . && docker run -p 8000:8000 agelive`
 2. **Liveness:** возьмите Silent-Face-Anti-Spoofing (MiniFASNetV2), экспортируйте в ONNX → `models/antispoof.onnx`
    (вход 1×3×80×80 BGR 0-255, класс 1 = real; проверьте на своей экспортированной модели).
    Без файла используется слабая эвристика (муар + блики), только для демо.
+
+Проверить совместимость положенных в `models/` весов:
+```bash
+python scripts/check_models.py --image face.jpg
+# если у модели антиспуфинга живой класс под индексом 0:
+AGELIVE_LIVE_REAL_IDX=0 uvicorn app.main:app --reload
+```
 
 ## Оценка
 ```bash

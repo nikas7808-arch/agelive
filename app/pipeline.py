@@ -46,6 +46,7 @@ class Pipeline:
             return out("no_face", reasons=["no_face"])
 
         # 1) идёт active challenge
+        just_passed = False
         if sess and sess.challenge is not None:
             st = sess.challenge.update(face, now)
             if st == "pending":
@@ -54,9 +55,10 @@ class Pipeline:
             if st == "failed":
                 return out("rejected", live=False, reasons=["challenge_failed"])
             sess.verified_until = now + cfg.verified_ttl_s
+            just_passed = True
 
         # 2) quality gate
-        q = assess(face, cfg, check_pose=True)
+        q = assess(face, cfg, check_pose=not just_passed)
         if not q.ok:
             return out("bad_quality", reasons=q.reasons)
 
@@ -77,9 +79,10 @@ class Pipeline:
 
         # 4) возраст
         res = self.age.predict(face.crop)
-        age, rng, conf = res.age, res.interval, res.confidence
+        age, rng, conf, probs = res.age, res.interval, res.confidence, res.probs
         if sess:
-            age, rng, conf = sess.push_age(age, rng, conf)
+            age, rng, conf, probs = sess.push_age(age, rng, conf, probs)
+        p_over = float(probs[threshold:].sum())
         return out("ok", live=True, liveness_score=score, age=round(age, 1),
                    age_range=[round(float(v), 1) for v in rng], confidence=round(conf, 2),
-                   p_over_threshold=round(res.p_over(threshold), 3), threshold=threshold)
+                   p_over_threshold=round(p_over, 3), threshold=threshold)
