@@ -1,9 +1,9 @@
-__pycache__/
-*.pyc
-data/*
-!data/.gitkeep
-.pytest_cache/
-
-.venv/
 .DS_Store
-data/UTKFace/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+data/
+!models/*.onnx
+!models/test_files.txt

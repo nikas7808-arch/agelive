@@ -1,53 +1,37 @@
-# AgeLive: определение возраста по камере с liveness
+# AgeLive: оценка возраста по камере с защитой от спуфинга (Liveness)
 
-Pipeline: детекция → quality gate → liveness (passive + active) → возраст → JSON. Возраст отдаётся только живым лицам.
+Автономный сервис верификации возраста в реальном времени на базе **FastAPI**, **MediaPipe** и **ONNX Runtime**.
+Возраст возвращается клиенту **только после прохождения проверки живости лица (Liveness)**.
 
-## Быстрый старт
-> **Важно:** для работы детектора лица MediaPipe используйте **Python 3.11 или 3.12** (на 3.14 старый API `mp.solutions` недоступен).
+## Требования
+- **Python 3.11 или 3.12** (для работы MediaPipe FaceMesh и активных проверок моргания/поворота головы).
+- Обученные веса уже лежат в `models/age.onnx` и `models/antispoof.onnx`.
 
+## Быстрый старт (macOS / Linux)
 ```bash
+git clone https://github.com/nikas7808-arch/agelive.git
+cd agelive
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-AGELIVE_MOCK=1 uvicorn app.main:app --reload     # без весов, заглушки моделей
-# с весами: положите models/age.onnx (и models/antispoof.onnx), затем без MOCK
+uvicorn app.main:app --reload
 ```
-Демо с веб-камерой: http://localhost:8000/demo/ (камера требует HTTPS или localhost).
 
-Docker: `docker build -t agelive . && docker run -p 8000:8000 agelive`
-
-## API
-- `POST /estimate?threshold=18&session_id=...` (multipart, поле `file`) → JSON
-- `WS /stream?threshold=18` - бинарные JPEG-кадры туда, JSON обратно (challenge работает в потоке)
-- `GET /health`
-
-```json
-{"status":"ok","live":true,"liveness_score":0.97,"age":34.2,"age_range":[30,38],
- "confidence":0.88,"p_over_threshold":0.99,"threshold":18,"latency_ms":62}
+## Быстрый старт (Windows PowerShell)
+```powershell
+git clone https://github.com/nikas7808-arch/agelive.git
+cd agelive
+py -3.12 -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\uvicorn app.main:app --reload
 ```
-`status`: `ok | no_face | bad_quality | challenge | uncertain | rejected`.
 
-## Модели
-1. **Возраст:** `python scripts/train_age.py --data data/UTKFace --epochs 20` (EfficientNet-B0, DEX) → `models/age.onnx`
-   (`pip install -r requirements-train.txt`). Или экспортируйте свою модель с входом 1×3×224×224 и выходом 101 логит.
-2. **Liveness:** возьмите Silent-Face-Anti-Spoofing (MiniFASNetV2), экспортируйте в ONNX → `models/antispoof.onnx`
-   (вход 1×3×80×80 BGR 0-255, класс 1 = real; проверьте на своей экспортированной модели).
-   Без файла используется слабая эвристика (муар + блики), только для демо.
+Откройте в браузере **http://localhost:8000/demo/** и нажмите **«Старт»**.
 
-Проверить совместимость положенных в `models/` весов:
+## Проверка и замеры метрик
 ```bash
-python scripts/check_models.py --image face.jpg
-# если у модели антиспуфинга живой класс под индексом 0:
-AGELIVE_LIVE_REAL_IDX=0 uvicorn app.main:app --reload
-```
-
-## Оценка
-```bash
-python scripts/eval_age.py --data data/UTKFace --list models/test_files.txt
-python scripts/eval_liveness.py --data data/attacks      # live/ screen/ print/ ...
-python scripts/benchmark.py --image face.jpg --n 100
 pytest
+python scripts/check_models.py
+python scripts/eval_age.py --data data/UTKFace --list models/test_files.txt
+python scripts/eval_liveness.py --data data/attacks
+python scripts/benchmark.py --image face.jpg --n 100
 ```
-Настройки порогов: переменные `AGELIVE_*` (см. `app/config.py`). Документы: `docs/`.
-
-## Статус проверки
-Логика (age, quality, active challenge, пайплайн) покрыта тестами. Сквозной запуск с реальными моделями,
-MediaPipe и камерой нужно проверить на вашей машине: в среде, где собирался репозиторий, не было сети и FastAPI.

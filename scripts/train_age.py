@@ -43,7 +43,7 @@ class Faces(Dataset):
 
 
 def soft_labels(age, sigma=2.0):
-    d = torch.exp(-0.5 * ((AGES[None] - age[:, None].float()) / sigma) ** 2)
+    d = torch.exp(-0.5 * ((AGES[None].to(age.device) - age[:, None].float()) / sigma) ** 2)
     return d / d.sum(1, keepdim=True)
 
 
@@ -64,14 +64,14 @@ def main():
     print(f"train {len(tr)} val {len(va)} test {len(te)}")
     open("models/test_files.txt", "w").write("\n".join(te))   # для честной оценки
 
-    dev = "cuda" if torch.cuda.is_available() else "cpu"
+    dev = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
     m = torchvision.models.efficientnet_b0(weights="IMAGENET1K_V1")
     m.classifier[1] = nn.Linear(m.classifier[1].in_features, 101)
     m.to(dev)
     opt = torch.optim.AdamW(m.parameters(), lr=a.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, a.epochs)
-    dl = DataLoader(Faces(tr, True), a.bs, shuffle=True, num_workers=4, drop_last=True)
-    vl = DataLoader(Faces(va, False), a.bs, num_workers=4)
+    dl = DataLoader(Faces(tr, True), a.bs, shuffle=True, num_workers=0, drop_last=True)
+    vl = DataLoader(Faces(va, False), a.bs, num_workers=0)
     best = 1e9
     for ep in range(a.epochs):
         m.train()

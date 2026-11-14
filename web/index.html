@@ -3,49 +3,125 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AgeLive demo</title>
+<title>AgeLive — Оценка возраста и Liveness</title>
 <style>
-:root{--bg:#fff;--fg:#1a1a1a;--card:#f2f2f2;--ok:#1a7f37;--bad:#c62828;--warn:#b26a00}
-@media (prefers-color-scheme:dark){:root{--bg:#161616;--fg:#eee;--card:#262626;--ok:#4cc26a;--bad:#ff6b6b;--warn:#ffb74d}}
-body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif;max-width:640px;margin-inline:auto}
-video{width:100%;border-radius:12px;transform:scaleX(-1);background:#000}
-#status{font-size:20px;font-weight:600;margin:12px 0}
-pre{background:var(--card);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px}
-button{font:inherit;padding:10px 16px;border-radius:8px;border:0;background:var(--fg);color:var(--bg)}
+:root{--bg:#f4f6f9;--surface:#fff;--surface2:#f8fafc;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--pri:#2563eb;--ok-bg:#dcfce7;--ok-fg:#15803d;--warn-bg:#fef3c7;--warn-fg:#b45309;--bad-bg:#fee2e2;--bad-fg:#b91c1c}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0f19;--surface:#111827;--surface2:#1e293b;--fg:#f8fafc;--muted:#94a3b8;--border:#1f2937;--pri:#3b82f6;--ok-bg:rgba(22,163,74,.2);--ok-fg:#4ade80;--warn-bg:rgba(217,119,6,.2);--warn-fg:#fbbf24;--bad-bg:rgba(220,38,38,.2);--bad-fg:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 16px 40px;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:720px;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+h1{font-size:22px;margin:0}
+.sub{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;font-size:12px;font-weight:600;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.badge.on .dot{background:#22c55e}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.04)}
+.vbox{position:relative;width:100%;aspect-ratio:4/3;background:#000;border-radius:12px;overflow:hidden}
+video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block}
+.guide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.oval{width:42%;height:68%;border:2px dashed rgba(255,255,255,.45);border-radius:50%;box-shadow:0 0 0 9999px rgba(0,0,0,.22)}
+.ctrl{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+button{font:inherit;font-weight:600;padding:10px 20px;border-radius:10px;border:0;cursor:pointer;background:var(--pri);color:#fff}
+button.stop{background:#ef4444}
+.lat{font-size:13px;color:var(--muted)}
+.banner{margin-top:14px;padding:14px 16px;border-radius:12px;font-size:16px;font-weight:600;border:1px solid var(--border);background:var(--surface2)}
+.banner.ok{background:var(--ok-bg);color:var(--ok-fg)}
+.banner.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.banner.bad{background:var(--bad-bg);color:var(--bad-fg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px}
+.m{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.ml{font-size:12px;color:var(--muted);margin-bottom:4px}
+.mv{font-size:20px;font-weight:700}
+.bar{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:8px}
+.fill{height:100%;width:0%;background:var(--pri);transition:width .2s}
+details{margin-top:14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px}
+summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)}
+pre{margin:10px 0 0;font-size:12px;overflow-x:auto}
 </style>
 </head>
 <body>
-<h2>AgeLive: возраст + liveness</h2>
-<video id="v" autoplay playsinline muted></video>
-<div id="status">Нажмите «Старт»</div>
-<button id="go">Старт</button>
-<pre id="json">{}</pre>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>AgeLive</h1>
+      <p class="sub">Проверка живости лица (Liveness) и оценка возраста в реальном времени</p>
+    </div>
+    <div id="conn" class="badge"><span class="dot"></span><span id="ct">Отключено</span></div>
+  </header>
+  <div class="card">
+    <div class="vbox">
+      <video id="v" autoplay playsinline muted></video>
+      <div class="guide"><div class="oval"></div></div>
+    </div>
+    <div class="ctrl">
+      <button id="go">Старт</button>
+      <div id="lat" class="lat">Ожидание запуска камеры…</div>
+    </div>
+    <div id="status" class="banner">Нажмите «Старт» и поместите лицо в овал</div>
+    <div class="grid">
+      <div class="m"><div class="ml">Оценка возраста</div><div id="ma" class="mv">—</div></div>
+      <div class="m"><div class="ml">Интервал (P10–P90)</div><div id="mr" class="mv">—</div></div>
+      <div class="m"><div class="ml">Вероятность 18+</div><div id="mp" class="mv">—</div><div class="bar"><div id="mb" class="fill"></div></div></div>
+      <div class="m"><div class="ml">Liveness / Уверенность</div><div id="mlv" class="mv">—</div></div>
+    </div>
+    <details>
+      <summary>Технический ответ API (JSON)</summary>
+      <pre id="json">{}</pre>
+    </details>
+  </div>
+</div>
 <script>
-const MSG={no_face:"Лицо не найдено",bad_quality:"Плохой кадр: ",uncertain:"Не удалось подтвердить, что вы живой",
-rejected:"Отклонено (подозрение на подмену)"};
+const MSG={no_face:"Лицо не найдено — поместите лицо в центр кадра",bad_quality:"Низкое качество кадра: ",uncertain:"Не удалось подтвердить живость лица",rejected:"Отклонено: подозрение на подмену (экран / фото)"};
 const RSN={face_too_small:"подойдите ближе",blurry:"камера размыта",too_dark:"слишком темно",too_bright:"слишком ярко",head_turned:"смотрите прямо в камеру"};
-const CH={blink:"Моргните",turn_left:"Поверните голову влево",turn_right:"Поверните голову вправо"};
+const CH={blink:"Проверка живости: моргните",turn_left:"Проверка живости: поверните голову влево",turn_right:"Проверка живости: поверните голову вправо"};
 const $=id=>document.getElementById(id);
-let ws,timer;
+let ws=null,timer=null,ms=null;
+function rst(){$("ma").textContent="—";$("mr").textContent="—";$("mp").textContent="—";$("mb").style.width="0%";$("mlv").textContent="—";}
+function stop(){
+  if(timer){clearInterval(timer);timer=null;}
+  if(ws){ws.close();ws=null;}
+  if(ms){ms.getTracks().forEach(t=>t.stop());ms=null;}
+  $("v").srcObject=null;$("conn").className="badge";$("ct").textContent="Отключено";
+  $("go").textContent="Старт";$("go").className="";
+  $("status").className="banner";$("status").textContent="Камера остановлена. Нажмите «Старт»";
+}
 $("go").onclick=async()=>{
-  const stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});
-  $("v").srcObject=stream;
+  if(ws||ms){stop();return;}
+  try{ms=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});}
+  catch(e){$("status").className="banner bad";$("status").textContent="Нет доступа к веб-камере";return;}
+  $("v").srcObject=ms;$("go").textContent="Остановить";$("go").className="stop";
   const proto=location.protocol==="https:"?"wss":"ws";
   ws=new WebSocket(`${proto}://${location.host}/stream?threshold=18`);
-  ws.onmessage=e=>{
-    const r=JSON.parse(e.data); $("json").textContent=JSON.stringify(r,null,2);
-    const s=$("status");
-    if(r.status==="ok"){s.textContent=`Живой. Возраст ≈ ${r.age} (${r.age_range[0]}-${r.age_range[1]}), 18+: ${Math.round(r.p_over_threshold*100)}%`;s.style.color="var(--ok)"}
-    else if(r.status==="challenge"){s.textContent=CH[r.challenge]||"Выполните действие";s.style.color="var(--warn)"}
-    else{s.textContent=(MSG[r.status]||r.status)+(r.status==="bad_quality"?r.reasons.map(x=>RSN[x]||x).join(", "):"");s.style.color="var(--bad)"}
+  ws.onopen=()=>{
+    $("conn").className="badge on";$("ct").textContent="Онлайн (10 FPS)";
+    const c=document.createElement("canvas");c.width=640;c.height=480;
+    timer=setInterval(()=>{
+      if(!ws||ws.readyState!==1||ws.bufferedAmount>0)return;
+      c.getContext("2d").drawImage($("v"),0,0,640,480);
+      c.toBlob(b=>b&&ws&&ws.readyState===1&&ws.send(b),"image/jpeg",0.82);
+    },100);
   };
-  const c=document.createElement("canvas");c.width=640;c.height=480;
-  ws.onopen=()=>{timer=setInterval(()=>{
-    if(ws.bufferedAmount>0)return;                 // не копим очередь
-    c.getContext("2d").drawImage($("v"),0,0,640,480);
-    c.toBlob(b=>b&&ws.send(b),"image/jpeg",0.8);
-  },100)};                                         // ~10 FPS (нужно для детекции моргания)
-  ws.onclose=()=>clearInterval(timer);
+  ws.onmessage=e=>{
+    const r=JSON.parse(e.data);$("json").textContent=JSON.stringify(r,null,2);
+    if(r.latency_ms!==undefined)$("lat").textContent=`Задержка: ${r.latency_ms} мс`;
+    const s=$("status");
+    if(r.status==="ok"){
+      const p18=Math.round((r.p_over_threshold||0)*100);
+      s.className="banner ok";s.textContent=`Проверка пройдена: живое лицо (${p18>=50?"18+ подтверждён":"младше 18"})`;
+      $("ma").textContent=`${r.age} лет`;$("mr").textContent=`${r.age_range[0]} – ${r.age_range[1]}`;
+      $("mp").textContent=`${p18}%`;$("mb").style.width=`${p18}%`;
+      $("mlv").textContent=`${Math.round((r.liveness_score||0)*100)}% / ${Math.round((r.confidence||0)*100)}%`;
+    }else if(r.status==="challenge"){
+      s.className="banner warn";s.textContent=CH[r.challenge]||"Выполните действие";rst();
+    }else{
+      s.className="banner bad";
+      const ex=r.status==="bad_quality"&&r.reasons?r.reasons.map(x=>RSN[x]||x).join(", "):"";
+      s.textContent=(MSG[r.status]||r.status)+ex;
+      if(r.liveness_score!=null)$("mlv").textContent=`${Math.round(r.liveness_score*100)}%`;else rst();
+    }
+  };
+  ws.onclose=()=>{if(ms)stop();};
 };
 </script>
 </body>
