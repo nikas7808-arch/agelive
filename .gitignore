@@ -2,8 +2,6 @@ __pycache__/
 *.pyc
 data/*
 !data/.gitkeep
-models/*.onnx
-models/*.pt
 .pytest_cache/
 
 .venv/
