@@ -35,3 +35,8 @@ python scripts/eval_age.py --data data/UTKFace --list models/test_files.txt
 python scripts/eval_liveness.py --data data/attacks
 python scripts/benchmark.py --image face.jpg --n 100
 ```
+
+## Метрики (Prometheus)
+Сервис отдаёт метрики на **http://localhost:8000/metrics**: RPS, время стадий пайплайна, исходы и причины отказов,
+liveness-скоры, результаты челленджей, WebSocket-подключения, состояние бэкендов.
+Список и примеры запросов: [docs/METRICS.md](docs/METRICS.md). Конфиг Prometheus: `monitoring/prometheus.yml`.

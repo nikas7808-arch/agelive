@@ -1,0 +1,13 @@
+# Запуск (Docker Desktop на Windows/macOS), из корня репозитория:
+#   docker run --rm -p 9090:9090 -v ${PWD}/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+# Сервис AgeLive при этом работает на хосте: uvicorn app.main:app --port 8000
+# Prometheus UI: http://localhost:9090
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: agelive
+    metrics_path: /metrics
+    static_configs:
+      # из контейнера до хоста; если AgeLive тоже в Docker, замените на имя сервиса: agelive:8000
+      - targets: ["host.docker.internal:8000"]

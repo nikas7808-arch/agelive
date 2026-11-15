@@ -12,6 +12,8 @@ from .config import Settings
 from .detector import FaceDetector
 from .liveness.active import ActiveChallenge
 from .liveness.passive import PassiveLiveness
+from .metrics import (AGE_CONFIDENCE, AGE_PREDICTION, CHALLENGE_ISSUED, CHALLENGE_RESULT,
+                      LIVENESS_SCORE, PIPE_OUTCOME, PIPE_REASON, PIPE_STAGE_LATENCY)
 from .quality import assess
 from .session import SessionStore
 
@@ -39,9 +41,13 @@ class Pipeline:
 
         def out(status, **kw):
             kw.setdefault("reasons", [])
+            PIPE_OUTCOME.labels(status).inc()
+            for r in kw["reasons"]:
+                PIPE_REASON.labels(r).inc()
             return {"status": status, "latency_ms": round((time.perf_counter() - t0) * 1000, 1), **kw}
 
-        face = self.detector.detect(frame)
+        with PIPE_STAGE_LATENCY.labels("detect").time():
+            face = self.detector.detect(frame)
         if face is None:
             return out("no_face", reasons=["no_face"])
 
@@ -51,6 +57,7 @@ class Pipeline:
             st = sess.challenge.update(face, now)
             if st == "pending":
                 return out("challenge", live=False, challenge=sess.challenge.kind)
+            CHALLENGE_RESULT.labels(sess.challenge.kind, st).inc()
             sess.challenge = None
             if st == "failed":
                 return out("rejected", live=False, reasons=["challenge_failed"])
@@ -58,12 +65,15 @@ class Pipeline:
             just_passed = True
 
         # 2) quality gate
-        q = assess(face, cfg, check_pose=not just_passed)
+        with PIPE_STAGE_LATENCY.labels("quality").time():
+            q = assess(face, cfg, check_pose=not just_passed)
         if not q.ok:
             return out("bad_quality", reasons=q.reasons)
 
         # 3) passive liveness (+ сглаживание по сессии)
-        score = self.passive.score(frame, face)
+        with PIPE_STAGE_LATENCY.labels("passive_liveness").time():
+            score = self.passive.score(frame, face)
+        LIVENESS_SCORE.observe(score)
         if sess:
             score = sess.push_live(score)
         score = round(score, 3)
@@ -73,15 +83,19 @@ class Pipeline:
         if score < cfg.t_live and not verified:
             if sess is not None and self.detector.supports_active:
                 sess.challenge = ActiveChallenge.random(cfg.challenge_timeout_s, now)
+                CHALLENGE_ISSUED.labels(sess.challenge.kind).inc()
                 return out("challenge", live=False, liveness_score=score,
                            challenge=sess.challenge.kind)
             return out("uncertain", live=False, liveness_score=score, reasons=["low_liveness"])
 
         # 4) возраст
-        res = self.age.predict(face.crop)
+        with PIPE_STAGE_LATENCY.labels("age").time():
+            res = self.age.predict(face.crop)
         age, rng, conf, probs = res.age, res.interval, res.confidence, res.probs
         if sess:
             age, rng, conf, probs = sess.push_age(age, rng, conf, probs)
+        AGE_PREDICTION.observe(age)
+        AGE_CONFIDENCE.observe(conf)
         p_over = float(probs[threshold:].sum())
         return out("ok", live=True, liveness_score=score, age=round(age, 1),
                    age_range=[round(float(v), 1) for v in rng], confidence=round(conf, 2),

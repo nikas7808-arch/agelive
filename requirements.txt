@@ -8,3 +8,4 @@ mediapipe<0.10.15,>=0.10
 pydantic>=2.6
 pytest>=8.0
 httpx>=0.27
+prometheus-client>=0.19
