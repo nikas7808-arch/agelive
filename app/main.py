@@ -1,5 +1,6 @@
 """FastAPI: POST /estimate (кадр), WS /stream (поток), GET /health, демо на /demo."""
 import os
+import time
 import uuid
 from typing import Optional
 
@@ -7,14 +8,43 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
+from .metrics import (HTTP_LATENCY, HTTP_REQUESTS, WS_CONNECTIONS, WS_FRAMES,
+                      metrics_response, set_backend_info, set_thresholds)
 from .pipeline import Pipeline
 from .schemas import EstimateResponse
 
 app = FastAPI(title="AgeLive", version="0.1.0")
 pipe = Pipeline(settings)
+set_backend_info(pipe.info())
+set_thresholds(settings)
+
+
+@app.middleware("http")
+async def metrics_middleware(request, call_next):
+    """RPS / латентность / коды ответов. WebSocket сюда не попадает (см. /stream)."""
+    start = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        # шаблон маршрута, а не сырой путь: иначе мусорные URL плодят бесконечные серии
+        scope = request.scope
+        route = scope.get("route")
+        if route is not None:
+            endpoint = route.path
+        elif isinstance(scope.get("endpoint"), StaticFiles):
+            endpoint = (scope.get("root_path") or "") + "/*"      # статика демо: /demo/*
+        else:
+            endpoint = "unmatched"
+        if endpoint != "/metrics":
+            HTTP_REQUESTS.labels(request.method, endpoint, str(status)).inc()
+            HTTP_LATENCY.labels(request.method, endpoint).observe(time.perf_counter() - start)
 
 
 def decode(data: bytes) -> np.ndarray:
@@ -27,6 +57,16 @@ def decode(data: bytes) -> np.ndarray:
 @app.get("/health")
 def health():
     return {"ok": True, **pipe.info()}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    return metrics_response()
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard():
+    return RedirectResponse("/demo/dashboard.html")
 
 
 @app.post("/estimate", response_model=EstimateResponse)
@@ -47,6 +87,7 @@ async def estimate(file: UploadFile = File(...),
 async def stream(ws: WebSocket, threshold: int = 18):
     """Клиент шлёт JPEG-кадры (binary), получает JSON на каждый кадр."""
     await ws.accept()
+    WS_CONNECTIONS.inc()
     sid = uuid.uuid4().hex
     try:
         while True:
@@ -54,13 +95,16 @@ async def stream(ws: WebSocket, threshold: int = 18):
             try:
                 frame = decode(data)
             except ValueError:
+                WS_FRAMES.labels("invalid_image").inc()
                 await ws.send_json({"status": "error", "reasons": ["invalid_image"]})
                 continue
+            WS_FRAMES.labels("ok").inc()
             res = await run_in_threadpool(pipe.process, frame, sid, threshold)
             await ws.send_json(res)
     except WebSocketDisconnect:
         pass
     finally:
+        WS_CONNECTIONS.dec()
         pipe.sessions.drop(sid)      # данные сессии не храним
 
 
