@@ -14,8 +14,8 @@ from app.pipeline import Pipeline
 client = TestClient(app)
 
 
-def val(name, **labels):
-    return REGISTRY.get_sample_value(name, labels) or 0.0
+def val(metric, /, **labels):
+    return REGISTRY.get_sample_value(metric, labels) or 0.0
 
 
 class FakeDet:
@@ -126,3 +126,18 @@ def test_websocket_gauge_and_frames():
         assert ws.receive_json()["status"] == "no_face"
     assert val("agelive_ws_connections_active") == base
     assert val("agelive_ws_frames_total", result="invalid_image") == frames0 + 1
+
+
+def test_thresholds_exposed_and_dashboard_redirect():
+    from app.config import settings
+    assert val("agelive_liveness_threshold", name="t_live") == settings.t_live
+    assert val("agelive_liveness_threshold", name="t_spoof") == settings.t_spoof
+    r = client.get("/dashboard", follow_redirects=False)
+    assert r.status_code in (302, 307) and r.headers["location"] == "/demo/dashboard.html"
+
+
+def test_static_demo_has_own_label_not_unmatched():
+    before = val("agelive_http_requests_total", method="GET", endpoint="/demo/*", status="200")
+    r = client.get("/demo/dashboard.html")
+    assert r.status_code == 200 and "AgeLive" in r.text
+    assert val("agelive_http_requests_total", method="GET", endpoint="/demo/*", status="200") == before + 1

@@ -8,17 +8,19 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .metrics import (HTTP_LATENCY, HTTP_REQUESTS, WS_CONNECTIONS, WS_FRAMES,
-                      metrics_response, set_backend_info)
+                      metrics_response, set_backend_info, set_thresholds)
 from .pipeline import Pipeline
 from .schemas import EstimateResponse
 
 app = FastAPI(title="AgeLive", version="0.1.0")
 pipe = Pipeline(settings)
 set_backend_info(pipe.info())
+set_thresholds(settings)
 
 
 @app.middleware("http")
@@ -31,9 +33,15 @@ async def metrics_middleware(request, call_next):
         status = response.status_code
         return response
     finally:
-        route = request.scope.get("route")
         # шаблон маршрута, а не сырой путь: иначе мусорные URL плодят бесконечные серии
-        endpoint = getattr(route, "path", None) or "unmatched"
+        scope = request.scope
+        route = scope.get("route")
+        if route is not None:
+            endpoint = route.path
+        elif isinstance(scope.get("endpoint"), StaticFiles):
+            endpoint = (scope.get("root_path") or "") + "/*"      # статика демо: /demo/*
+        else:
+            endpoint = "unmatched"
         if endpoint != "/metrics":
             HTTP_REQUESTS.labels(request.method, endpoint, str(status)).inc()
             HTTP_LATENCY.labels(request.method, endpoint).observe(time.perf_counter() - start)
@@ -54,6 +62,11 @@ def health():
 @app.get("/metrics", include_in_schema=False)
 def metrics():
     return metrics_response()
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard():
+    return RedirectResponse("/demo/dashboard.html")
 
 
 @app.post("/estimate", response_model=EstimateResponse)

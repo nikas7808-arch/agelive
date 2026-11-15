@@ -7,12 +7,21 @@
 Без метрик мы не знаем, сколько запросов держит сервис, какая стадия пайплайна самая медленная,
 как часто срабатывает защита от спуфинга и поднялась ли модель при старте.
 
-## Быстрая проверка
+## Дашборд (без Docker)
+Откройте **http://localhost:8000/dashboard** (редирект на `/demo/dashboard.html`) и параллельно запустите демо
+на `/demo/`: страница обновляется каждые 2 секунды. Она ничего не хранит и без внешних библиотек разбирает
+текст `/metrics` прямо в браузере: файл `web/dashboard.html`.
+
+Что на ней: кадры и запросы в секунду, самая медленная стадия, p50/p95 каждой стадии за последнюю минуту,
+исходы кадров, причины отказов, гистограмма liveness-скора с порогами T_spoof/T_live, таблица challenge,
+распределение возраста, таблица HTTP-запросов, предупреждения (mock, эвристика вместо модели, нет MediaPipe).
+
+## Быстрая проверка сырых метрик
 ```bash
 uvicorn app.main:app
 curl http://localhost:8000/metrics
 ```
-Для графиков: `monitoring/prometheus.yml` (команда запуска Prometheus в комментарии файла).
+Для графиков и своих запросов: `monitoring/prometheus.yml` (команда запуска Prometheus в комментарии файла).
 
 ## Список метрик
 | Метрика | Тип | Лейблы | Что показывает |
@@ -29,9 +38,11 @@ curl http://localhost:8000/metrics
 | `agelive_age_confidence` | histogram | - | Уверенность оценки возраста |
 | `agelive_ws_connections_active` | gauge | - | Активные WebSocket-подключения |
 | `agelive_ws_frames_total` | counter | result: ok, invalid_image | Кадры по WebSocket |
+| `agelive_liveness_threshold` | gauge | name: t_spoof, t_live | Пороги liveness из конфига (нужны дашборду для зон на гистограмме) |
 | `agelive_backend_info` | gauge | detector, liveness_backend, mock | Какие бэкенды подняты. `liveness_backend="heuristic"` = antispoof.onnx не загрузился |
 
-`/metrics` сам себя в счётчиках не учитывает. Незнакомые URL попадают в `endpoint="unmatched"`.
+`/metrics` сам себя в счётчиках не учитывает. Статика демо (`/demo/...`) идёт под меткой `endpoint="/demo/*"`,
+незнакомые URL попадают в `endpoint="unmatched"`.
 
 ## Полезные запросы (PromQL)
 ```promql

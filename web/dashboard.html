@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgeLive — Метрики</title>
+<style>
+:root{--bg:#f4f6f9;--surface:#fff;--surface2:#f8fafc;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--pri:#2563eb;
+--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--ok-bg:#dcfce7;--ok-fg:#15803d;--warn-bg:#fef3c7;--warn-fg:#b45309;--bad-bg:#fee2e2;--bad-fg:#b91c1c;
+--c1:#2563eb;--c2:#16a34a;--zone-bad:rgba(220,38,38,.10);--zone-warn:rgba(217,119,6,.12);--zone-ok:rgba(22,163,74,.10)}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0f19;--surface:#111827;--surface2:#1e293b;--fg:#f8fafc;--muted:#94a3b8;--border:#1f2937;--pri:#3b82f6;
+--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--ok-bg:rgba(22,163,74,.2);--ok-fg:#4ade80;--warn-bg:rgba(217,119,6,.2);--warn-fg:#fbbf24;--bad-bg:rgba(220,38,38,.2);--bad-fg:#f87171;
+--c1:#60a5fa;--c2:#4ade80;--zone-bad:rgba(248,113,113,.14);--zone-warn:rgba(251,191,36,.14);--zone-ok:rgba(74,222,128,.12)}}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 16px 40px;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+h1{font-size:22px;margin:0}
+h2{font-size:14px;margin:0 0 2px}
+.sub{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);margin:0 0 10px}
+a{color:var(--pri)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;font-size:12px;font-weight:600;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.badge.on .dot{background:#22c55e}.badge.off .dot{background:#ef4444}
+.alert{margin-bottom:10px;padding:10px 14px;border-radius:12px;font-size:14px;font-weight:600;border:1px solid var(--border)}
+.alert.warn{background:var(--warn-bg);color:var(--warn-fg)}.alert.bad{background:var(--bad-bg);color:var(--bad-fg)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
+.kl{font-size:12px;color:var(--muted);margin-bottom:2px}
+.kv{font-size:24px;font-weight:700;line-height:1.2}
+.ks{font-size:12px;color:var(--muted);margin-top:2px;min-height:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:12px}
+@media (max-width:520px){.grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;min-width:0}
+.empty{font-size:13px;color:var(--muted);padding:18px 0;text-align:center}
+svg.chart{width:100%;height:auto;display:block}
+svg text{fill:var(--muted);font-size:10px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.hb{display:grid;grid-template-columns:130px 1fr 92px;align-items:center;gap:10px;margin:7px 0;font-size:13px}
+.hb .tr{height:10px;background:var(--surface2);border-radius:99px;overflow:hidden;border:1px solid var(--border)}
+.hb .fl{height:100%;border-radius:99px;background:var(--pri)}
+.hb .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.hb .l small{color:var(--muted)}
+.stg{margin:9px 0}
+.stg .top{display:flex;justify-content:space-between;font-size:13px}
+.stg .top span:last-child{color:var(--muted);font-variant-numeric:tabular-nums}
+.stg .tr{position:relative;height:10px;background:var(--surface2);border-radius:99px;border:1px solid var(--border);margin-top:4px;overflow:hidden}
+.stg .p95{position:absolute;inset:0 auto 0 0;background:var(--warn);opacity:.45;border-radius:99px}
+.stg .p50{position:absolute;inset:0 auto 0 0;background:var(--pri);border-radius:99px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+th{font-size:12px;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:600;background:var(--surface2);border:1px solid var(--border)}
+.tag.ok{background:var(--ok-bg);color:var(--ok-fg)}.tag.warn{background:var(--warn-bg);color:var(--warn-fg)}.tag.bad{background:var(--bad-bg);color:var(--bad-fg)}
+footer{margin-top:18px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>AgeLive · Метрики</h1>
+      <p class="sub">Обновляется каждые 2 с. Данные из <a href="/metrics" target="_blank" rel="noopener">/metrics</a>. Нагрузку даёт <a href="/demo/">демо</a>.</p>
+    </div>
+    <div id="conn" class="badge"><span class="dot"></span><span id="ct">Подключаюсь…</span></div>
+  </header>
+
+  <div id="alerts"></div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kl">Кадров в секунду</div><div class="kv" id="k-fps">—</div><div class="ks" id="k-fps-s"></div></div>
+    <div class="kpi"><div class="kl">HTTP-запросов в секунду</div><div class="kv" id="k-rps">—</div><div class="ks" id="k-rps-s"></div></div>
+    <div class="kpi"><div class="kl">Успешных кадров</div><div class="kv" id="k-ok">—</div><div class="ks" id="k-ok-s"></div></div>
+    <div class="kpi"><div class="kl">Самая медленная стадия</div><div class="kv" id="k-slow">—</div><div class="ks" id="k-slow-s"></div></div>
+    <div class="kpi"><div class="kl">WebSocket-подключений</div><div class="kv" id="k-ws">—</div><div class="ks" id="k-ws-s"></div></div>
+    <div class="kpi"><div class="kl">Ошибки HTTP</div><div class="kv" id="k-err">—</div><div class="ks" id="k-err-s"></div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card" style="grid-column:1/-1">
+      <h2>Нагрузка во времени</h2>
+      <p class="hint">Последние ~4 минуты. Кадры пайплайна и HTTP-запросы в секунду.</p>
+      <div id="ch-load"></div>
+      <div class="legend"><span><i style="background:var(--c1)"></i>кадров/с</span><span><i style="background:var(--c2)"></i>HTTP-запросов/с</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Время стадий пайплайна</h2>
+      <p class="hint" id="stage-hint">Синяя полоса: p50, жёлтая: p95. Окно 60 с.</p>
+      <div id="stages"></div>
+    </div>
+
+    <div class="card">
+      <h2>Чем заканчивается обработка кадра</h2>
+      <p class="hint">За всё время работы сервиса.</p>
+      <div id="outcomes"></div>
+    </div>
+
+    <div class="card">
+      <h2>Liveness score</h2>
+      <p class="hint">Распределение скора до сглаживания. Фон: ниже T_spoof отказ, между порогами active challenge, выше T_live живой.</p>
+      <div id="ch-live"></div>
+    </div>
+
+    <div class="card">
+      <h2>Причины отказов</h2>
+      <p class="hint">Почему кадр не дошёл до оценки возраста.</p>
+      <div id="reasons"></div>
+    </div>
+
+    <div class="card">
+      <h2>Active challenge</h2>
+      <p class="hint">«Провалено» включает таймауты.</p>
+      <div id="challenges"></div>
+    </div>
+
+    <div class="card">
+      <h2>Предсказанный возраст</h2>
+      <p class="hint">Распределение выданных оценок (после сглаживания по сессии).</p>
+      <div id="ch-age"></div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h2>HTTP-запросы</h2>
+      <p class="hint">Шаблоны маршрутов; незнакомые URL попадают в «unmatched».</p>
+      <div id="http"></div>
+    </div>
+  </div>
+
+  <footer>Страница ничего не хранит: все числа считаются в браузере по тексту <code>/metrics</code>. Список метрик: docs/METRICS.md.</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var POLL_MS = 2000, MAXPTS = 120, WINDOW = 30;
+  var STAGES = [["detect", "детекция лица"], ["quality", "проверка качества"],
+                ["passive_liveness", "passive liveness"], ["age", "оценка возраста"]];
+  var OUTCOMES = [["ok", "успех (возраст выдан)", "ok"], ["no_face", "лица нет", ""],
+                  ["bad_quality", "плохое качество", "warn"], ["challenge", "выдан challenge", "warn"],
+                  ["uncertain", "неуверенно", "warn"], ["rejected", "отказ", "bad"]];
+  var KINDS = [["blink", "моргнуть"], ["turn_left", "повернуть влево"], ["turn_right", "повернуть вправо"]];
+  var REASONS = {no_face: "лица нет", face_too_small: "лицо слишком маленькое", blurry: "размыто",
+                 too_dark: "слишком темно", too_bright: "слишком светло", head_turned: "голова повёрнута",
+                 spoof_suspected: "подозрение на спуф", challenge_failed: "challenge не пройден",
+                 low_liveness: "низкий liveness"};
+
+  // ───────────── разбор формата Prometheus ─────────────
+  function parseProm(text) {
+    var out = [];
+    String(text).split("\n").forEach(function (raw) {
+      var line = raw.trim();
+      if (!line || line[0] === "#") return;
+      var m = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{(.*)\})?\s+(\S+)/);
+      if (!m) return;
+      var labels = {};
+      if (m[3]) {
+        var re = /([a-zA-Z_][a-zA-Z0-9_]*)="((?:[^"\\]|\\.)*)"/g, x;
+        while ((x = re.exec(m[3]))) labels[x[1]] = x[2].replace(/\\(.)/g, function (_, c) { return c === "n" ? "\n" : c; });
+      }
+      var v = m[4] === "+Inf" ? Infinity : m[4] === "-Inf" ? -Infinity : parseFloat(m[4]);
+      out.push({ name: m[1], labels: labels, value: v });
+    });
+    return out;
+  }
+  function matches(s, where) {
+    for (var k in where) if (s.labels[k] !== where[k]) return false;
+    return true;
+  }
+  function pick(samples, name, where) {
+    return samples.filter(function (s) { return s.name === name && matches(s, where || {}); });
+  }
+  function total(samples, name, where) {
+    return pick(samples, name, where).reduce(function (a, s) { return a + (isFinite(s.value) ? s.value : 0); }, 0);
+  }
+  function byLabel(samples, name, key, where) {
+    var m = {};
+    pick(samples, name, where).forEach(function (s) { m[s.labels[key]] = (m[s.labels[key]] || 0) + s.value; });
+    return m;
+  }
+  // кумулятивная гистограмма: [{le, c}] по возрастанию le, последний le = Infinity
+  function histogram(samples, base, where) {
+    var b = pick(samples, base + "_bucket", where).map(function (s) {
+      return { le: s.labels.le === "+Inf" ? Infinity : parseFloat(s.labels.le), c: s.value };
+    }).sort(function (a, c) { return a.le - c.le; });
+    return b;
+  }
+  function histCount(b) { return b.length ? b[b.length - 1].c : 0; }
+  function deltaHist(cur, old) {
+    return cur.map(function (x, i) { return { le: x.le, c: Math.max(0, x.c - (old[i] ? old[i].c : 0)) }; });
+  }
+  function quantile(b, q) {
+    var tot = histCount(b);
+    if (!tot) return null;
+    var rank = q * tot, prevLe = 0, prevC = 0;
+    for (var i = 0; i < b.length; i++) {
+      if (b[i].c >= rank) {
+        if (!isFinite(b[i].le)) return prevLe;
+        var span = b[i].c - prevC;
+        if (span <= 0) return b[i].le;
+        return prevLe + (b[i].le - prevLe) * ((rank - prevC) / span);
+      }
+      prevLe = b[i].le; prevC = b[i].c;
+    }
+    return prevLe;
+  }
+  // кумулятивные бакеты -> столбики [{lo, hi, n}]; бакет le<=0 и +Inf склеиваются с соседями
+  function bins(b) {
+    var out = [], prevC = 0, prevLe = 0, carry = 0;
+    b.forEach(function (x) {
+      var n = x.c - prevC;
+      if (x.le <= 0) { carry += n; }
+      else if (!isFinite(x.le)) { if (out.length) out[out.length - 1].n += n; }
+      else { out.push({ lo: prevLe, hi: x.le, n: n + carry }); carry = 0; prevLe = x.le; }
+      prevC = x.c;
+    });
+    return out;
+  }
+
+  // ───────────── DOM-помощники ─────────────
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function mk(ns, tag, attrs, kids) {
+    var e = ns ? document.createElementNS(SVGNS, tag) : document.createElement(tag);
+    for (var k in (attrs || {})) {
+      if (k === "class") e.setAttribute("class", attrs[k]); else e.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { if (c != null) e.appendChild(typeof c === "object" ? c : document.createTextNode(String(c))); });
+    return e;
+  }
+  function h(tag, attrs, kids) { return mk(false, tag, attrs, kids); }
+  function sv(tag, attrs, kids) { return mk(true, tag, attrs, kids); }
+  function clear(id) { var e = document.getElementById(id); e.textContent = ""; return e; }
+  function setText(id, t) { document.getElementById(id).textContent = t; }
+  function empty(host, text) { host.appendChild(h("div", { class: "empty" }, [text || "Пока нет данных. Покажите лицо камере на странице демо."])); }
+
+  function fmtMs(sec) {
+    if (sec == null) return "—";
+    var ms = sec * 1000;
+    return (ms < 10 ? ms.toFixed(1) : Math.round(ms)) + " мс";
+  }
+  function fmtNum(n) { return Math.round(n).toLocaleString("ru-RU"); }
+  function fmtRate(r) { return r == null ? "—" : (r < 10 ? r.toFixed(1) : String(Math.round(r))); }
+  function niceMax(m) {
+    if (!(m > 0)) return 1;
+    var p = Math.pow(10, Math.floor(Math.log10(m))), f = m / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+  }
+
+  // ───────────── графики ─────────────
+  function lineChart(host, series) {
+    var W = 600, H = 170, L = 38, R = 8, T = 8, B = 20, pw = W - L - R, ph = H - T - B;
+    var all = [];
+    series.forEach(function (s) { all = all.concat(s.values); });
+    var max = niceMax(Math.max.apply(null, [0].concat(all)));
+    var svg = sv("svg", { viewBox: "0 0 " + W + " " + H, class: "chart", role: "img", "aria-label": "Нагрузка во времени" });
+    [0, 0.5, 1].forEach(function (f) {
+      var y = T + ph - f * ph;
+      svg.appendChild(sv("line", { x1: L, x2: W - R, y1: y, y2: y, stroke: "var(--border)", "stroke-width": 1 }));
+      svg.appendChild(sv("text", { x: L - 5, y: y + 3, "text-anchor": "end" }, [fmtRate(max * f)]));
+    });
+    svg.appendChild(sv("text", { x: L, y: H - 5 }, ["4 мин назад"]));
+    svg.appendChild(sv("text", { x: W - R, y: H - 5, "text-anchor": "end" }, ["сейчас"]));
+    series.forEach(function (s) {
+      var n = s.values.length;
+      if (!n) return;
+      var pts = s.values.map(function (v, i) {
+        var x = L + ((i + MAXPTS - n) / (MAXPTS - 1)) * pw;
+        return x.toFixed(1) + "," + (T + ph - (v / max) * ph).toFixed(1);
+      }).join(" ");
+      svg.appendChild(sv("polyline", { points: pts, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round" }));
+    });
+    host.textContent = "";
+    host.appendChild(svg);
+  }
+
+  function histChart(host, bn, opts) {
+    var W = 600, H = 190, L = 34, R = 8, T = 10, B = 28, pw = W - L - R, ph = H - T - B;
+    var max = Math.max.apply(null, [1].concat(bn.map(function (b) { return b.n; })));
+    var domain = bn[bn.length - 1].hi;
+    var svg = sv("svg", { viewBox: "0 0 " + W + " " + H, class: "chart", role: "img", "aria-label": opts.label });
+    function xOf(v) { return L + (v / domain) * pw; }
+    (opts.zones || []).forEach(function (z) {
+      var x0 = xOf(Math.max(0, z.from)), x1 = xOf(Math.min(domain, z.to));
+      if (x1 > x0) svg.appendChild(sv("rect", { x: x0, y: T, width: x1 - x0, height: ph, fill: z.fill }));
+    });
+    svg.appendChild(sv("line", { x1: L, x2: W - R, y1: T + ph, y2: T + ph, stroke: "var(--border)" }));
+    svg.appendChild(sv("text", { x: L - 5, y: T + 8, "text-anchor": "end" }, [fmtNum(max)]));
+    svg.appendChild(sv("text", { x: L - 5, y: T + ph, "text-anchor": "end" }, ["0"]));
+    bn.forEach(function (b, i) {
+      var x0 = xOf(b.lo), x1 = xOf(b.hi), hh = (b.n / max) * ph;
+      svg.appendChild(sv("rect", { x: x0 + 1, y: T + ph - hh, width: Math.max(1, x1 - x0 - 2), height: hh, rx: 2, fill: "var(--pri)" },
+        [sv("title", {}, [b.lo + "–" + b.hi + ": " + fmtNum(b.n)])]));
+      if (i % (opts.labelEvery || 1) === 0) svg.appendChild(sv("text", { x: x0, y: H - 14, "text-anchor": "middle" }, [String(b.lo)]));
+    });
+    svg.appendChild(sv("text", { x: xOf(domain), y: H - 14, "text-anchor": "middle" }, [String(domain)]));
+    (opts.marks || []).forEach(function (m) {
+      var x = xOf(m.at);
+      svg.appendChild(sv("line", { x1: x, x2: x, y1: T, y2: T + ph, stroke: m.color, "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
+      svg.appendChild(sv("text", { x: x + 3, y: T + 10, fill: m.color, style: "fill:" + m.color }, [m.label]));
+    });
+    svg.appendChild(sv("text", { x: W - R, y: H - 2, "text-anchor": "end" }, [opts.xTitle || ""]));
+    host.textContent = "";
+    host.appendChild(svg);
+  }
+
+  function hbars(host, rows, totalN) {
+    host.textContent = "";
+    rows.forEach(function (r) {
+      var pct = totalN ? (r.n / totalN) * 100 : 0;
+      var fill = h("div", { class: "fl", style: "width:" + pct.toFixed(1) + "%;background:" + (r.color || "var(--pri)") });
+      host.appendChild(h("div", { class: "hb" }, [
+        h("div", { class: "l" }, [r.label]),
+        h("div", { class: "tr" }, [fill]),
+        h("div", { class: "v" }, [fmtNum(r.n) + " · " + (pct < 10 ? pct.toFixed(1) : Math.round(pct)) + "%"])
+      ]));
+    });
+  }
+
+  // ───────────── состояние и расчёт ─────────────
+  var state = { prev: null, fps: [], rps: [], stageSnaps: {}, last: null };
+  function resetState() { state.prev = null; state.fps = []; state.rps = []; state.stageSnaps = {}; }
+  function push(arr, v) { arr.push(v); if (arr.length > MAXPTS) arr.shift(); }
+
+  function stageStats(stage, samples) {
+    var cur = histogram(samples, "agelive_pipeline_stage_duration_seconds", { stage: stage });
+    if (!histCount(cur)) return null;
+    var snaps = state.stageSnaps[stage] = state.stageSnaps[stage] || [];
+    snaps.push(cur);
+    if (snaps.length > WINDOW + 1) snaps.shift();
+    var win = snaps.length > 1 ? deltaHist(cur, snaps[0]) : null;
+    var useWin = win && histCount(win) > 0, hist = useWin ? win : cur;
+    return { p50: quantile(hist, 0.5), p95: quantile(hist, 0.95), win: useWin, n: histCount(cur) };
+  }
+
+  function render(samples, now) {
+    var httpTotal = total(samples, "agelive_http_requests_total");
+    var frames = total(samples, "agelive_pipeline_outcome_total");
+    var prev = state.prev;
+    if (prev && (httpTotal < prev.http || frames < prev.frames)) { resetState(); prev = null; }
+    var fps = null, rps = null;
+    if (prev && now > prev.t) {
+      fps = (frames - prev.frames) / ((now - prev.t) / 1000);
+      rps = (httpTotal - prev.http) / ((now - prev.t) / 1000);
+      push(state.fps, fps); push(state.rps, rps);
+    }
+    state.prev = { t: now, http: httpTotal, frames: frames };
+
+    // предупреждения
+    var al = clear("alerts");
+    var info = pick(samples, "agelive_backend_info")[0];
+    if (info) {
+      if (info.labels.mock === "true") al.appendChild(h("div", { class: "alert warn" }, ["Включён AGELIVE_MOCK: вместо моделей работают заглушки, цифры не настоящие."]));
+      if (info.labels.liveness_backend === "heuristic") al.appendChild(h("div", { class: "alert warn" }, ["Liveness работает на эвристике: модель antispoof.onnx не загрузилась."]));
+      if (info.labels.detector === "haar") al.appendChild(h("div", { class: "alert warn" }, ["MediaPipe недоступен, детекция на Haar-каскаде: active challenge отключён."]));
+    }
+
+    // KPI
+    setText("k-fps", fmtRate(fps)); setText("k-fps-s", frames ? "всего обработано: " + fmtNum(frames) : "кадров ещё не было");
+    setText("k-rps", fmtRate(rps)); setText("k-rps-s", "всего: " + fmtNum(httpTotal));
+    var outc = byLabel(samples, "agelive_pipeline_outcome_total", "status");
+    var okN = outc.ok || 0;
+    setText("k-ok", frames ? Math.round((okN / frames) * 100) + "%" : "—");
+    setText("k-ok-s", frames ? fmtNum(okN) + " из " + fmtNum(frames) + " кадров" : "");
+    var ws = pick(samples, "agelive_ws_connections_active")[0];
+    setText("k-ws", ws ? String(Math.round(ws.value)) : "—");
+    var wsOk = total(samples, "agelive_ws_frames_total", { result: "ok" }), wsBad = total(samples, "agelive_ws_frames_total", { result: "invalid_image" });
+    setText("k-ws-s", (wsOk + wsBad) ? "кадров по WS: " + fmtNum(wsOk + wsBad) + (wsBad ? " (битых: " + fmtNum(wsBad) + ")" : "") : "");
+    var st = byLabel(samples, "agelive_http_requests_total", "status");
+    var e5 = 0, e4 = 0;
+    Object.keys(st).forEach(function (k) { if (k[0] === "5") e5 += st[k]; else if (k[0] === "4") e4 += st[k]; });
+    setText("k-err", fmtNum(e5)); setText("k-err-s", "5xx · клиентских 4xx: " + fmtNum(e4));
+    document.getElementById("k-err").style.color = e5 ? "var(--bad)" : "";
+
+    // нагрузка
+    var ld = clear("ch-load");
+    lineChart(ld, [{ values: state.fps, color: "var(--c1)" }, { values: state.rps, color: "var(--c2)" }]);
+
+    // стадии
+    var sh = clear("stages"), slow = null, anyCum = false, anyData = false;
+    STAGES.forEach(function (s) {
+      var r = stageStats(s[0], samples);
+      if (!r) return;
+      anyData = true;
+      if (!r.win) anyCum = true;
+      if (!slow || r.p95 > slow.p95) slow = { name: s[1], p95: r.p95 };
+      r.label = s[1]; sh.appendChild(stageRow(r));
+    });
+    if (!anyData) empty(sh);
+    setText("stage-hint", "Синяя полоса: p50, жёлтая: p95." + (anyCum ? " Нет свежих кадров, показано за всё время." : " Окно 60 с."));
+    setText("k-slow", slow ? slow.name : "—"); setText("k-slow-s", slow ? "p95 " + fmtMs(slow.p95) : "");
+
+    // исходы и причины
+    var oh = clear("outcomes");
+    if (!frames) empty(oh);
+    else hbars(oh, OUTCOMES.map(function (o) { return { label: o[1], n: outc[o[0]] || 0, color: o[2] ? "var(--" + o[2] + ")" : "var(--muted)" }; }), frames);
+    var rh = clear("reasons"), rs = byLabel(samples, "agelive_pipeline_reason_total", "reason"), rk = Object.keys(rs).sort(function (a, b) { return rs[b] - rs[a]; });
+    if (!rk.length) empty(rh, "Отказов не было.");
+    else hbars(rh, rk.map(function (k) { return { label: REASONS[k] || k, n: rs[k], color: "var(--warn)" }; }), rk.reduce(function (a, k) { return a + rs[k]; }, 0));
+
+    // liveness
+    var lh = clear("ch-live"), lb = histogram(samples, "agelive_liveness_score");
+    if (!histCount(lb)) empty(lh);
+    else {
+      var th = {}; pick(samples, "agelive_liveness_threshold").forEach(function (x) { th[x.labels.name] = x.value; });
+      var zones = [], marks = [];
+      if (th.t_spoof != null && th.t_live != null) {
+        zones = [{ from: 0, to: th.t_spoof, fill: "var(--zone-bad)" }, { from: th.t_spoof, to: th.t_live, fill: "var(--zone-warn)" }, { from: th.t_live, to: 1, fill: "var(--zone-ok)" }];
+        marks = [{ at: th.t_spoof, label: "T_spoof " + th.t_spoof, color: "var(--bad)" }, { at: th.t_live, label: "T_live " + th.t_live, color: "var(--ok)" }];
+      }
+      histChart(lh, bins(lb), { zones: zones, marks: marks, label: "Распределение liveness score", xTitle: "score (0 = спуф, 1 = живой)" });
+    }
+
+    // challenge
+    var ch = clear("challenges"), iss = byLabel(samples, "agelive_challenge_issued_total", "kind");
+    var any = Object.keys(iss).length > 0;
+    if (!any) empty(ch, "Challenge ещё не выдавались.");
+    else {
+      var tb = h("table", {}, [h("tr", {}, [h("th", {}, ["Команда"]), h("th", { class: "n" }, ["Выдано"]), h("th", { class: "n" }, ["Пройдено"]), h("th", { class: "n" }, ["Провалено"]), h("th", { class: "n" }, ["% прохода"])])]);
+      KINDS.forEach(function (k) {
+        var p = total(samples, "agelive_challenge_result_total", { kind: k[0], result: "passed" }), f = total(samples, "agelive_challenge_result_total", { kind: k[0], result: "failed" });
+        var rate = (p + f) ? Math.round((p / (p + f)) * 100) + "%" : "—";
+        tb.appendChild(h("tr", {}, [h("td", {}, [k[1]]), h("td", { class: "n" }, [fmtNum(iss[k[0]] || 0)]), h("td", { class: "n" }, [fmtNum(p)]), h("td", { class: "n" }, [fmtNum(f)]), h("td", { class: "n" }, [rate])]));
+      });
+      ch.appendChild(tb);
+    }
+
+    // возраст
+    var ah = clear("ch-age"), ab = histogram(samples, "agelive_age_prediction_years");
+    if (!histCount(ab)) empty(ah);
+    else histChart(ah, bins(ab), { label: "Распределение предсказанного возраста", xTitle: "лет", labelEvery: 2 });
+
+    // HTTP
+    var hh = clear("http"), rows = {};
+    pick(samples, "agelive_http_requests_total").forEach(function (s) {
+      var key = s.labels.method + " " + s.labels.endpoint + " " + s.labels.status;
+      rows[key] = { method: s.labels.method, endpoint: s.labels.endpoint, status: s.labels.status, n: s.value };
+    });
+    var keys = Object.keys(rows).sort(function (a, b) { return rows[b].n - rows[a].n; });
+    if (!keys.length) empty(hh, "Запросов ещё не было.");
+    else {
+      var ht = h("table", {}, [h("tr", {}, [h("th", {}, ["Метод"]), h("th", {}, ["Маршрут"]), h("th", {}, ["Код"]), h("th", { class: "n" }, ["Запросов"]), h("th", { class: "n" }, ["Среднее время"])])]);
+      keys.slice(0, 12).forEach(function (k) {
+        var r = rows[k], w = { method: r.method, endpoint: r.endpoint };
+        var c = total(samples, "agelive_http_request_duration_seconds_count", w), sm = total(samples, "agelive_http_request_duration_seconds_sum", w);
+        var cls = r.status[0] === "5" ? "bad" : r.status[0] === "4" ? "warn" : "ok";
+        ht.appendChild(h("tr", {}, [h("td", {}, [r.method]), h("td", {}, [r.endpoint]), h("td", {}, [h("span", { class: "tag " + cls }, [r.status])]), h("td", { class: "n" }, [fmtNum(r.n)]), h("td", { class: "n" }, [c ? fmtMs(sm / c) : "—"])]));
+      });
+      hh.appendChild(ht);
+    }
+  }
+
+  function stageRow(r) {
+    var scale = Math.max(r.p95 || 0, 1e-6);
+    var width95 = 100, width50 = Math.min(100, ((r.p50 || 0) / scale) * 100);
+    return h("div", { class: "stg" }, [
+      h("div", { class: "top" }, [h("span", {}, [r.label]), h("span", {}, ["p50 " + fmtMs(r.p50) + " · p95 " + fmtMs(r.p95)])]),
+      h("div", { class: "tr" }, [h("div", { class: "p95", style: "width:" + width95 + "%" }), h("div", { class: "p50", style: "width:" + width50.toFixed(1) + "%" })])
+    ]);
+  }
+
+  function setConn(ok, text) {
+    var c = document.getElementById("conn");
+    c.className = "badge " + (ok ? "on" : "off");
+    setText("ct", text);
+  }
+
+  function tick() {
+    return fetch("/metrics", { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    }).then(function (text) {
+      var samples = parseProm(text);
+      render(samples, Date.now());
+      setConn(true, "Онлайн · " + new Date().toLocaleTimeString("ru-RU"));
+    }).catch(function () {
+      setConn(false, "Нет связи с сервисом");
+    });
+  }
+
+  window.AgeLiveDash = { parseProm: parseProm, histogram: histogram, quantile: quantile, bins: bins, deltaHist: deltaHist, niceMax: niceMax, tick: tick, state: state, resetState: resetState };
+  if (!window.__NO_AUTOSTART__) { tick(); setInterval(tick, POLL_MS); }
+})();
+</script>
+</body>
+</html>

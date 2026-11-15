@@ -37,6 +37,6 @@ python scripts/benchmark.py --image face.jpg --n 100
 ```
 
 ## Метрики (Prometheus)
-Сервис отдаёт метрики на **http://localhost:8000/metrics**: RPS, время стадий пайплайна, исходы и причины отказов,
+Живой дашборд: **http://localhost:8000/dashboard** (без Docker, обновляется каждые 2 с). Сырой текст для Prometheus: **http://localhost:8000/metrics**: RPS, время стадий пайплайна, исходы и причины отказов,
 liveness-скоры, результаты челленджей, WebSocket-подключения, состояние бэкендов.
 Список и примеры запросов: [docs/METRICS.md](docs/METRICS.md). Конфиг Prometheus: `monitoring/prometheus.yml`.

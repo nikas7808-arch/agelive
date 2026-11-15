@@ -61,6 +61,16 @@ BACKEND_INFO = Gauge(
     ["detector", "liveness_backend", "mock"])
 
 
+# Пороги из конфига: нужны дашборду, чтобы показать зоны отказ / челлендж / живой
+LIVENESS_THRESHOLD = Gauge(
+    "agelive_liveness_threshold", "Пороги liveness из конфига", ["name"])
+
+
+def set_thresholds(cfg) -> None:
+    LIVENESS_THRESHOLD.labels("t_spoof").set(cfg.t_spoof)
+    LIVENESS_THRESHOLD.labels("t_live").set(cfg.t_live)
+
+
 def set_backend_info(info: dict) -> None:
     BACKEND_INFO.clear()
     BACKEND_INFO.labels(
